@@ -11,6 +11,53 @@ const FALLBACK = [
   { style: '日常场景', explanation: '手机电量掉的快慢、奶茶降温的快慢——"此刻变化有多快"就是导数。', scene: '📱☕' },
 ]
 
+const DEMO_ANIM_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0612;overflow:hidden;font-family:system-ui,sans-serif}canvas{display:block}</style></head><body><canvas id="c"></canvas><script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');let W,H,t=0;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=420}resize();window.addEventListener('resize',resize);
+function f(x){return 0.15*x*x*x-0.5*x}function df(x){return 0.45*x*x-0.5}
+const trail=[];
+function frame(){ctx.clearRect(0,0,W,H);
+const ox=W/2,oy=H*0.6,s=45;
+ctx.strokeStyle='rgba(162,155,254,0.08)';ctx.lineWidth=1;
+for(let x=0;x<W;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+for(let y=0;y<H;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1.5;
+ctx.beginPath();ctx.moveTo(40,oy);ctx.lineTo(W-20,oy);ctx.stroke();
+ctx.beginPath();ctx.moveTo(ox,H-20);ctx.lineTo(ox,20);ctx.stroke();
+ctx.fillStyle='rgba(255,255,255,0.3)';ctx.font='11px system-ui';ctx.textAlign='center';
+for(let i=-5;i<=5;i++){if(i===0)continue;const sx=ox+i*s;ctx.beginPath();ctx.moveTo(sx,oy-3);ctx.lineTo(sx,oy+3);ctx.stroke();ctx.fillText(i,sx,oy+15)}
+ctx.textAlign='center';ctx.font='bold 16px system-ui';ctx.fillStyle='#a29bfe';ctx.fillText('导数 · f(x) 与 f\\'(x) 可视化',W/2,28);
+ctx.font='12px system-ui';ctx.fillStyle='#ff6b6b';ctx.fillText('f(x) = 0.15x³ - 0.5x',W/2,48);
+ctx.beginPath();ctx.strokeStyle='#ff6b6b';ctx.lineWidth=2.5;ctx.shadowColor='rgba(255,107,107,0.3)';ctx.shadowBlur=8;
+for(let x=-6;x<=6;x+=0.05){const sx=ox+x*s,sy=oy-f(x)*s;x===-6?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy)}ctx.stroke();ctx.shadowBlur=0;
+ctx.beginPath();ctx.strokeStyle='rgba(162,155,254,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+for(let x=-6;x<=6;x+=0.05){const sx=ox+x*s,sy=oy-df(x)*s;x===-6?ctx.moveTo(sx,sy):ctx.lineTo(sx,sy)}ctx.stroke();ctx.setLineDash([]);
+ctx.font='12px system-ui';ctx.fillStyle='#a29bfe';ctx.fillText("f'(x) = 0.45x² - 0.5",W-80,oy-df(4)*s-10);
+const px=4.5*Math.sin(t*0.6),py=f(px),slope=df(px);
+const sx=ox+px*s,sy=oy-py*s;
+trail.push({x:sx,y:sy,a:1});if(trail.length>80)trail.shift();
+for(const p of trail){ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,Math.PI*2);ctx.fillStyle='rgba(249,202,36,'+(p.a*0.4)+')';ctx.fill();p.a*=0.97}
+const tdx=70,tdy=slope*70;ctx.beginPath();ctx.moveTo(sx-tdx,sy+tdy);ctx.lineTo(sx+tdx,sy-tdy);ctx.strokeStyle='#00d2d3';ctx.lineWidth=2;ctx.shadowColor='rgba(0,210,211,0.4)';ctx.shadowBlur=10;ctx.stroke();ctx.shadowBlur=0;
+ctx.beginPath();ctx.arc(sx,sy,14,0,Math.PI*2);ctx.fillStyle='rgba(249,202,36,0.12)';ctx.fill();
+ctx.beginPath();ctx.arc(sx,sy,6,0,Math.PI*2);ctx.fillStyle='#f9ca24';ctx.shadowColor='rgba(249,202,36,0.6)';ctx.shadowBlur=12;ctx.fill();ctx.shadowBlur=0;
+const sColor=slope>0?'#4ade80':slope<0?'#f87171':'#fbbf24';
+ctx.font='bold 13px system-ui';ctx.fillStyle=sColor;ctx.textAlign='center';ctx.fillText("斜率 = "+slope.toFixed(2),sx,sy-25);
+ctx.font='11px system-ui';ctx.fillStyle='rgba(255,255,255,0.4)';ctx.fillText('x = '+px.toFixed(1),sx,sy+28);
+const status=slope>0.1?'📈 递增 (导数>0)':slope<-0.1?'📉 递减 (导数<0)':'⚡ 极值点 (导数≈0)';
+ctx.font='13px system-ui';ctx.fillStyle='rgba(255,255,255,0.5)';ctx.fillText(status,W/2,H-25);
+t+=0.015;requestAnimationFrame(frame)}frame();
+</script></body></html>`
+
+const DEMO_PRESET = {
+  explanations: [
+    { style: '生活类比', explanation: '想象你骑自行车上坡，刚开始坡度很缓，你轻轻蹬就能前进；突然坡度变陡，你得站起来拼命蹬才能往上走。这里的"坡度陡不陡"就是导数，它告诉你"在某个点上，函数值变化得有多快"。', scene: '🚲⛰️' },
+    { style: '视觉画面', explanation: '想象一幅图画：你面前有一条弯弯曲曲的山路。在路上的每一个点，你放一把小尺子紧贴着路面——尺子的倾斜方向和角度，就是那个点的导数。尺子越陡，说明路在那里变化越剧烈。', scene: '📏🛤️' },
+    { style: '日常场景', explanation: '你泡了一杯热奶茶放在桌上。刚放下时降温很快（导数绝对值大），放久了降得慢（导数绝对值小），和室温一样时就不降了（导数为零）。温度变化的快慢，就是温度函数对时间的导数。', scene: '☕📉' },
+  ],
+  images: [null, null, null],
+  animation: DEMO_ANIM_HTML,
+}
+
 const COLORS = [
   { bg: 'from-[#ff6b6b]/25 to-[#ff8e53]/10', border: 'border-[#ff6b6b]/30', accent: '#ff6b6b' },
   { bg: 'from-[#a29bfe]/25 to-[#6c5ce7]/10', border: 'border-[#a29bfe]/30', accent: '#a29bfe' },
@@ -21,21 +68,33 @@ const glass = 'rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-b
 
 function useChat() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: '嗨！我是你的数学讲解助手 ✨\n有任何关于这个知识点的问题，随时问我！' }
+    { role: 'assistant', content: '嗨！我是你的数学讲解助手 ✨\n有问题随时问我，也可以拍照上传数学题！' }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingImage, setPendingImage] = useState(null)
 
-  const send = useCallback(async (text) => {
-    if (!text.trim() || loading) return
-    const userMsg = { role: 'user', content: text }
-    setMessages(prev => [...prev, userMsg])
+  const sendWithImage = useCallback(async (text, imageDataUrl) => {
+    if ((!text.trim() && !imageDataUrl) || loading) return
+
+    const content = []
+    if (imageDataUrl) content.push({ type: 'image_url', image_url: { url: imageDataUrl } })
+    content.push({ type: 'text', text: text.trim() || '请帮我看看这道题' })
+
+    const userMsg = { role: 'user', content }
+    const displayMsg = { role: 'user', content: text.trim() || '📷 [上传了一张图片]', image: imageDataUrl }
+
+    setMessages(prev => [...prev, displayMsg])
     setInput('')
+    setPendingImage(null)
     setLoading(true)
     try {
-      const history = [...messages.slice(-6), userMsg]
+      const history = [...messages.slice(-4).map(m => {
+        if (m.image) return { role: m.role, content: [{ type: 'image_url', image_url: { url: m.image } }, { type: 'text', text: m.content }] }
+        return { role: m.role, content: m.content }
+      }), userMsg]
       const reply = await chatWithAssistant(history)
-      setMessages(prev => [...prev, { role: 'assistant', content: reply || '抱歉，我没能理解你的问题，能换个方式问吗？' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: reply || '让我再想想～' }])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: '网络出了点问题，请稍后再试 ~' }])
     } finally {
@@ -43,7 +102,9 @@ function useChat() {
     }
   }, [messages, loading])
 
-  return { messages, input, setInput, send, loading }
+  const send = useCallback((text) => sendWithImage(text, null), [sendWithImage])
+
+  return { messages, input, setInput, send, sendWithImage, loading, pendingImage, setPendingImage }
 }
 
 // ── Recording Hook ──
@@ -212,19 +273,37 @@ export default function Create() {
               <p className="text-[11px] text-violet-300/70 font-medium">教材原文 · {textbook.title}</p>
               <p className="text-sm text-white/75 font-mono mt-1">{textbook.content}</p>
             </div>
-            <motion.button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="w-full rounded-xl py-3 text-sm font-semibold text-[#1a0a0a] disabled:opacity-50"
-              style={{ background: 'linear-gradient(135deg, #ff6b6b, #a29bfe, #f9ca24)', backgroundSize: '200% auto' }}
-              animate={{ backgroundPosition: ['0% center', '100% center', '0% center'] }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
-            >
-              <HiSparkles className="inline mr-1.5" />
-              {isGenerating ? '生成中…' : 'AI 提供思路'}
-            </motion.button>
+            <div className="flex gap-3">
+              <motion.button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="flex-1 rounded-xl py-3 text-sm font-semibold text-[#1a0a0a] disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #ff6b6b, #a29bfe, #f9ca24)', backgroundSize: '200% auto' }}
+                animate={{ backgroundPosition: ['0% center', '100% center', '0% center'] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                <HiSparkles className="inline mr-1.5" />
+                {isGenerating ? '生成中…' : 'AI 提供思路'}
+              </motion.button>
+              <motion.button
+                onClick={() => {
+                  setAiResults(DEMO_PRESET.explanations)
+                  setEditedTexts(DEMO_PRESET.explanations.map(e => e.explanation))
+                  setGeneratedImages(DEMO_PRESET.images)
+                  setSelectedIdx(0)
+                  setStep(2)
+                  setGenId(g => g + 1)
+                  setAnimHtml(DEMO_PRESET.animation)
+                }}
+                className="rounded-xl px-5 py-3 text-sm font-semibold border border-white/20 text-white/70 hover:text-white hover:border-white/30 transition-colors"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+              >
+                ⚡ Demo
+              </motion.button>
+            </div>
           </div>
 
           {/* ── Step 2: 灵感卡片（可编辑 + 生成配图） ── */}
@@ -432,16 +511,22 @@ export default function Create() {
             {canFinalize && (
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={`${glass} p-5`}>
                 <p className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">4 · 定稿</p>
-                <div className="rounded-xl bg-black/20 border border-white/[0.06] p-4 mb-4">
-                  <div>
-                    <div>
-                      <p className="text-xs text-[#f9ca24]/70 font-medium mb-1">{aiResults[selectedIdx]?.style}</p>
-                      <p className="text-sm text-white/85 leading-relaxed">{editedTexts[selectedIdx]}</p>
+                <div className="rounded-xl bg-black/20 border border-white/[0.06] overflow-hidden mb-4">
+                  {/* 封面图 */}
+                  {generatedImages[selectedIdx] && (
+                    <img src={generatedImages[selectedIdx]} alt="" className="w-full max-h-64 object-cover" />
+                  )}
+                  <div className="p-4">
+                    <span className="inline-block rounded-full bg-[#f9ca24]/15 border border-[#f9ca24]/30 px-2.5 py-0.5 text-[10px] font-semibold text-[#f9ca24] mb-2">
+                      {aiResults[selectedIdx]?.style}
+                    </span>
+                    <p className="text-sm text-white/85 leading-relaxed">{editedTexts[selectedIdx]}</p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {animHtml && <span className="text-[10px] bg-violet-500/10 border border-violet-400/20 text-violet-300 rounded-full px-2 py-0.5">✨ 数学动画</span>}
+                      {recorder.audioUrl && <span className="text-[10px] bg-[#ff6b6b]/10 border border-[#ff6b6b]/20 text-[#ff6b6b] rounded-full px-2 py-0.5">🎙️ 语音讲解</span>}
+                      {uploadedNotes.length > 0 && <span className="text-[10px] bg-[#f9ca24]/10 border border-[#f9ca24]/20 text-[#f9ca24] rounded-full px-2 py-0.5">📝 {uploadedNotes.length} 张笔记</span>}
                     </div>
                   </div>
-                  {animHtml && <p className="text-xs text-violet-300/50 mt-2">✨ 附带数学动画</p>}
-                  {recorder.audioUrl && <p className="text-xs text-[#ff6b6b]/50 mt-1">🎙️ 附带语音讲解</p>}
-                  {uploadedNotes.length > 0 && <p className="text-xs text-[#f9ca24]/50 mt-1">📝 附带 {uploadedNotes.length} 张手写笔记</p>}
                 </div>
                 <motion.button
                   onClick={handleSubmit}
@@ -484,6 +569,7 @@ export default function Create() {
                       ? 'bg-gradient-to-r from-coral-500/30 to-violet-500/20 text-white/90 rounded-br-md'
                       : 'bg-white/[0.06] text-white/75 rounded-bl-md'
                   }`}>
+                    {msg.image && <img src={msg.image} alt="" className="max-w-full max-h-32 rounded-lg mb-2" />}
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   </div>
                 </div>
@@ -505,18 +591,49 @@ export default function Create() {
               <div ref={chatEndRef} />
             </div>
 
-            <div className="px-3 py-3 border-t border-white/[0.06]">
+            <div className="px-3 py-3 border-t border-white/[0.06] space-y-2">
+              {chat.pendingImage && (
+                <div className="relative inline-block">
+                  <img src={chat.pendingImage} alt="" className="h-16 rounded-lg border border-white/10" />
+                  <button onClick={() => chat.setPendingImage(null)} className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-black/70 text-white text-[10px] flex items-center justify-center">✕</button>
+                </div>
+              )}
               <div className="flex gap-2">
+                <label className="shrink-0 flex items-center justify-center h-9 w-9 rounded-xl border border-white/10 bg-white/[0.04] cursor-pointer hover:bg-white/[0.08] transition-colors" title="上传图片">
+                  <span className="text-sm">📷</span>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = (ev) => chat.setPendingImage(ev.target.result)
+                    reader.readAsDataURL(file)
+                    e.target.value = ''
+                  }} />
+                </label>
                 <input
                   value={chat.input}
                   onChange={e => chat.setInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), chat.send(chat.input))}
-                  placeholder="问个问题…"
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), chat.sendWithImage(chat.input, chat.pendingImage))}
+                  onPaste={e => {
+                    const items = e.clipboardData?.items
+                    if (!items) return
+                    for (const item of items) {
+                      if (item.type.startsWith('image/')) {
+                        e.preventDefault()
+                        const file = item.getAsFile()
+                        const reader = new FileReader()
+                        reader.onload = (ev) => chat.setPendingImage(ev.target.result)
+                        reader.readAsDataURL(file)
+                        break
+                      }
+                    }
+                  }}
+                  placeholder={chat.pendingImage ? '描述图片中的问题…' : '问个问题，或粘贴截图…'}
                   className="flex-1 bg-black/20 border border-white/10 rounded-xl px-3 py-2 text-sm text-white/90 placeholder:text-white/25 focus:outline-none focus:border-violet-400/40"
                 />
                 <motion.button
-                  onClick={() => chat.send(chat.input)}
-                  disabled={chat.loading || !chat.input.trim()}
+                  onClick={() => chat.sendWithImage(chat.input, chat.pendingImage)}
+                  disabled={chat.loading || (!chat.input.trim() && !chat.pendingImage)}
                   className="shrink-0 rounded-xl bg-gradient-to-r from-coral-500/80 to-violet-500/80 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40"
                   whileTap={{ scale: 0.95 }}
                 >

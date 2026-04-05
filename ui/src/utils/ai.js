@@ -34,12 +34,18 @@ async function rawChatCompletion(messages, opts = {}) {
 
 // ── 讲解生成 ──
 export async function generateExplanations(topic, textbookContent) {
-  const prompt = `你的任务是把一个高中数学概念讲解成10岁小孩都能秒懂的话。不许用任何公式、术语、数学符号。只用日常生活中最简单的例子，用"你"来称呼读者，像姐姐跟妹妹聊天一样。
+  const prompt = `你的任务是帮高中女生理解一个数学概念。像姐姐跟妹妹聊天一样，用10岁小孩都能听懂的生活例子来讲，但每个例子必须在最后一句话把数学概念点明白。
 
-请提供3种不同风格的讲解，每种2-3句话：
-- 生活类比：用一个具体的日常动作/场景来类比
-- 视觉画面：用一个画面/动画感的描述，让人闭眼就能想象
-- 日常场景：用一个每天都会遇到的真实情境
+具体要求：
+1. 先用一个生活场景让她"啊，我懂了"
+2. 然后用一句话把场景和数学对应起来（比如"这里的'陡峭程度'就是导数的值，走平的地方就是导数等于零"）
+3. 不要用公式符号，但要让她读完确实知道这个数学概念是什么意思
+4. 每种讲解2-3句话，前半段讲故事，后半段回扣数学
+
+请提供3种不同风格的讲解：
+- 生活类比：用日常动作来类比，最后一句点明对应的数学含义
+- 视觉画面：用闭眼能想象的画面来讲，最后指出画面里哪部分是数学概念
+- 日常场景：用每天都会遇到的真实情境，最后说清楚这和数学课本讲的是同一件事
 
 教材原文：${textbookContent}
 知识点：${topic}
@@ -58,8 +64,28 @@ export async function generateExplanations(topic, textbookContent) {
   return JSON.parse(cleaned)
 }
 
-// ── Chatbot ──
+// ── Chatbot（支持图片理解）──
+const VISION_API_KEY = 'sk-6b285782ef1b45a9bfcf46cb5482c310'
+const VISION_API_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+const VISION_MODEL = 'qwen-vl-max'
+
 export async function chatWithAssistant(history) {
+  const hasImage = history.some(m => Array.isArray(m.content) && m.content.some(c => c.type === 'image_url'))
+
+  if (hasImage) {
+    const messages = [
+      { role: 'system', content: '你是帮助高中女生理解数学的助手。用户可能会上传数学题、手写笔记、课本截图。请看图后用10岁小孩能听懂的生活例子来讲解图中的数学内容。直接回答，3-5句话。' },
+      ...history,
+    ]
+    const res = await fetch(VISION_API_URL, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${VISION_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: VISION_MODEL, messages, max_tokens: 500 }),
+    })
+    const data = await res.json()
+    return data.choices?.[0]?.message?.content?.trim() || '让我再看看这张图～'
+  }
+
   const messages = [
     { role: 'system', content: '你是帮助高中女生理解数学的助手。用10岁小孩能听懂的例子解释。不用公式术语。直接回答，2-3句话，不要分析过程。如果问题不清楚就猜她想问什么。' },
     ...history,
@@ -69,7 +95,7 @@ export async function chatWithAssistant(history) {
 
 // ── 教学图生成（豆包）──
 export async function generateImage(explanationText, style) {
-  const prompt = `数学概念教学插图，简洁直观，深色背景。用生活场景图形化展示：${explanationText}。要求：画面清晰易懂，用图形和场景表达数学概念，配色鲜明温暖，风格适合高中女生，可爱友好，不要出现任何文字、字母、数字、公式。`
+  const prompt = `一张教学插图，同时展示生活场景和数学图形。左半边是生活场景：${explanationText}。右半边是对应的数学图形（坐标轴、曲线、关键点标记）。两边用虚线或箭头连接，表示"生活现象=数学概念"。深色背景，配色温暖鲜明（红色曲线、黄色标记点），可爱清晰的插画风格，适合高中女生。不要出现任何文字、字母、数字。`
 
   const res = await fetch(IMAGE_API_URL, {
     method: 'POST',
@@ -180,27 +206,36 @@ frame();
 </script></body></html>`
 
 export async function generateAnimation(explanationText, topic) {
-  const prompt = `你是一个数学可视化动画程序员。我给你一个 Canvas 动画模板，你需要填充两个部分来创建一个关于"${topic}"的数学动画。
+  const prompt = `你是一个数学教学动画程序员。请根据知识点"${topic}"创建一个专业的数学可视化动画。
 
 用户的讲解是："${explanationText}"
 
-请输出两段 JavaScript 代码：
+我给你一个 Canvas 模板，你填充两部分代码。
 
-**第一段 MATH_FUNCTION：** 定义数学函数，比如：
+**要求：动画必须精确展示数学概念本身，不是装饰性动画。** 具体：
+- 画出标准的坐标轴，带刻度标记（每隔1个单位一个小刻度线）和 x、y 轴标签
+- 画出与知识点相关的函数曲线（比如导数就画 f(x) 和 f'(x) 两条曲线）
+- 用移动的点演示核心概念（比如导数：点沿 f(x) 移动，同时在该点画切线，旁边实时显示切线斜率=导数值）
+- 在图上用中文标注关键数学概念（比如"f(x)=x²"、"f'(x)=2x"、"切线斜率=导数"、"极值点"）
+- 当点经过特殊位置时（极值点、零点、拐点），用不同颜色高亮并标注
+
+**颜色规范：** f(x)曲线=#ff6b6b，f'(x)曲线=#a29bfe，切线=#00d2d3，移动点=#f9ca24，标注文字=白色
+
+**第一段 MATH_FUNCTION：** 定义函数和坐标系，例如：
 function f(x) { return x * x; }
 function df(x) { return 2 * x; }
 const originX = W / 2, originY = H * 0.65;
-function toScreen(x, y) { return [originX + x * 60, originY - y * 60]; }
+const scale = 50;
+function toScreen(x, y) { return [originX + x * scale, originY - y * scale]; }
 
-**第二段 ANIMATION_CODE：** 定义 animate(t) 函数，要求：
-- 调用 drawAxes(originX, originY)
-- 画函数曲线（#ff6b6b，lineWidth 2.5）
-- 一个发光点沿曲线移动（#f9ca24）
-- 在移动点处画切线（#00d2d3）
-- 用 label() 显示动态数值
-- 加轨迹残影效果
+**第二段 ANIMATION_CODE：** 定义 animate(t) 函数。必须包含：
+1. drawAxes(originX, originY) 画坐标轴
+2. 刻度线和数字标注
+3. 函数曲线
+4. 移动点+切线+动态数值
+5. 关键概念的中文标注
 
-请严格按以下 JSON 格式返回：
+请严格按 JSON 返回：
 {"mathFunction": "代码...", "animationCode": "代码..."}`
 
   const content = await rawChatCompletion([{ role: 'user', content: prompt }], { temperature: 0.5, max_tokens: 2000 })
