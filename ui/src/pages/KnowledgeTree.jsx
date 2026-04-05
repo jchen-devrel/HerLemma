@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAvaxToast } from '../components/AvaxToast'
 import {
   CONCEPT_GRAPH, TRANSLATIONS, TOPICS, TOPIC_GRAPHS, TOPIC_LAYOUTS,
 } from '../data/mockTree'
@@ -9,8 +10,12 @@ const avatars = ['🦊','🐱','🌸','🌙','🦋','🐰','🌺','⭐','🍀','
 
 function TranslationCard({ node, rank }) {
   const likers = useMemo(() => avatars.slice(0, Math.min(5, Math.floor(node.votes / 60) + 2)), [node.votes])
+  const toast = useAvaxToast()
+  const [voted, setVoted] = useState(false)
+  const [localVotes, setLocalVotes] = useState(node.votes)
+
   return (
-    <Link to={`/translation/${node.id}`}>
+    <Link to={`/translation/${node.id}`} onClick={() => toast.pay(0.01, `查看 ${node.author} 的讲解`)}>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -36,8 +41,24 @@ function TranslationCard({ node, rank }) {
             )}
           </div>
           <p className="text-sm leading-relaxed text-white/80">「{node.translation}」</p>
-          <div className="mt-3 flex items-center gap-3 text-xs">
-            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2 py-1 text-emerald-300 border border-emerald-400/20">✅ {node.votes} 人听懂</span>
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (voted) return
+                setVoted(true)
+                setLocalVotes(v => v + 1)
+                toast.pay(0.05, `打赏 ${node.author} 的讲解`)
+              }}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 border transition-all ${
+                voted
+                  ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300'
+                  : 'bg-emerald-500/10 border-emerald-400/15 text-emerald-300/70 hover:bg-emerald-500/20 hover:border-emerald-400/30'
+              }`}
+            >
+              {voted ? '✅' : '👍'} {localVotes} 人听懂 {!voted && '· 打赏 0.05'}
+            </button>
             <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500/15 px-2 py-1 text-amber-200 border border-amber-400/20">💰 {node.earned} AVAX</span>
             <span className="inline-flex items-center gap-1 rounded-lg bg-violet-500/15 px-2 py-1 text-violet-200 border border-violet-400/20">$PROVE {node.prove}</span>
           </div>

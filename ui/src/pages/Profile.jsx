@@ -1,337 +1,195 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { HiLockClosed } from 'react-icons/hi'
-import { getConnectedAccount, readProfileSummary, shortenAddress, withdrawPendingRewards } from '../utils/chain'
+import { Link } from 'react-router-dom'
 
-const glass =
-  'rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-[20px] shadow-[0_8px_32px_rgba(0,0,0,0.2)]'
+const glass = 'rounded-2xl border border-white/[0.08] bg-white/[0.07] backdrop-blur-[20px]'
 
-function AvalancheMark({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <path fill="#E84142" d="M16 3L3 27h26L16 3zm0 6.2L22.4 23H9.6L16 9.2z" />
-    </svg>
-  )
-}
-
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08, delayChildren: 0.06 },
-  },
-}
-
-const item = {
-  hidden: { opacity: 0, y: 22 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
-  },
-}
-
-const earnedBadges = [
-  { id: 'first-voice', title: 'First Voice', emoji: '🎤', desc: '首条讲解被验证', glow: 'from-coral-500/30 to-amber-400/20' },
-  { id: 'first-earn', title: 'First Earning', emoji: '💰', desc: '首次赚到 AVAX', glow: 'from-amber-400/25 to-coral-500/20' },
-  { id: 'translator', title: 'Math Translator', emoji: '📐', desc: '10条讲解被验证', glow: 'from-violet-500/35 to-coral-400/15' },
-  { id: 'reviewer', title: 'Trusted Reviewer', emoji: '👁️', desc: '验证他人50次', glow: 'from-violet-400/30 to-violet-600/20' },
+const BADGES = [
+  { id: 'first-voice', title: 'First Voice', emoji: '🎤', desc: '首条讲解被验证', unlocked: true },
+  { id: 'first-earning', title: 'First Earning', emoji: '💰', desc: '首次赚到 AVAX', unlocked: true },
+  { id: 'translator', title: 'Math Translator', emoji: '📐', desc: '10条讲解被验证', unlocked: true },
+  { id: 'reviewer', title: 'Trusted Reviewer', emoji: '👁️', desc: '验证他人50次', unlocked: true },
+  { id: 'viral', title: 'Viral Explainer', emoji: '🔥', desc: '单条100+听懂', unlocked: false },
+  { id: 'brand', title: 'Brand Pick', emoji: '⭐', desc: '被品牌选中', unlocked: false },
 ]
 
-const lockedBadges = [
-  { id: 'viral', title: 'Viral Explainer', emoji: '🔥', desc: '需要单条100+听懂' },
-  { id: 'brand', title: 'Brand Pick', emoji: '⭐', desc: '需要被品牌选中' },
+const AVAX_RECORDS = [
+  { id: 1, type: 'earn', amount: 0.05, desc: '小鱼 打赏了你的导数讲解', time: '2 小时前' },
+  { id: 2, type: 'earn', amount: 0.05, desc: '悠悠 投票"听懂了"你的导数讲解', time: '3 小时前' },
+  { id: 3, type: 'pay', amount: 0.02, desc: '发布讲解：骑车上坡理解导数', time: '5 小时前' },
+  { id: 4, type: 'earn', amount: 0.01, desc: '思思 查看了你的讲解', time: '6 小时前' },
+  { id: 5, type: 'pay', amount: 0.05, desc: '打赏 小雨 的函数讲解', time: '8 小时前' },
+  { id: 6, type: 'pay', amount: 0.01, desc: '查看 小月 的概率讲解', time: '1 天前' },
+  { id: 7, type: 'earn', amount: 0.05, desc: '圆圆 打赏了你的数列讲解', time: '1 天前' },
+  { id: 8, type: 'earn', amount: 0.02, desc: '发布奖励：首条讲解上链', time: '2 天前' },
 ]
 
-const incomeRows = [
-  { time: '2026-04-02 21:14', type: '悬赏奖金', amount: '0.42' },
-  { time: '2026-03-28 16:03', type: '打赏', amount: '0.08' },
-  { time: '2026-03-15 09:41', type: '悬赏奖金', amount: '0.65' },
-  { time: '2026-03-01 12:22', type: '打赏', amount: '0.12' },
+const MY_EXPLANATIONS = [
+  { id: 1, topic: '导数的定义', style: '生活类比', text: '骑车上坡，导数就是脚下的陡峭程度', votes: 312, earned: 0.8, time: '2 天前' },
+  { id: 2, topic: '等差数列', style: '日常场景', text: '每月存钱，每次多存100块', votes: 89, earned: 0.15, time: '3 天前' },
+  { id: 3, topic: '条件概率', style: '视觉画面', text: '下雨天带伞的人里，有多少真的淋湿了', votes: 145, earned: 0.3, time: '5 天前' },
 ]
 
-function MiniChain() {
-  const nodes = 8
-  return (
-    <div className="flex items-center justify-center gap-0 py-4">
-      {Array.from({ length: nodes }, (_, i) => (
-        <div key={i} className="flex items-center">
-          <motion.div
-            className="relative h-3 w-3 rounded-full bg-gradient-to-br from-coral-400 to-violet-500 shadow-[0_0_12px_rgba(255,107,107,0.5)]"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.4 + i * 0.06, type: 'spring', stiffness: 380, damping: 18 }}
-          />
-          {i < nodes - 1 && (
-            <div
-              className="h-[2px] w-6 bg-gradient-to-r from-white/25 to-white/10 sm:w-8"
-              aria-hidden
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
+const LISTENED = [
+  { id: 101, author: '小雨', avatar: '🦊', topic: '函数单调性', text: '追剧时间线就是函数图像', cost: 0.01, time: '1 小时前' },
+  { id: 102, author: '小鹿', avatar: '🐚', topic: '导数几何意义', text: '画眉毛就是在画切线', cost: 0.01, time: '4 小时前' },
+  { id: 103, author: '悠悠', avatar: '🦢', topic: '等比数列', text: '压岁钱每年翻倍', cost: 0.01, time: '1 天前' },
+  { id: 104, author: '圆圆', avatar: '💫', topic: '古典概型', text: '抽奖机的中奖率怎么算', cost: 0.01, time: '2 天前' },
+]
+
+const item = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } }
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } }
 
 export default function Profile() {
-  const [summary, setSummary] = useState(null)
-  const [withdrawing, setWithdrawing] = useState(false)
-  const [withdrawTx, setWithdrawTx] = useState(null)
+  const [tab, setTab] = useState('records')
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      try {
-        const account = await getConnectedAccount()
-        if (!account) return
-        const profileSummary = await readProfileSummary(account)
-        if (!cancelled) {
-          setSummary(profileSummary)
-        }
-      } catch {
-        if (!cancelled) {
-          setSummary(null)
-        }
-      }
-    }
-
-    load()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const statCards = useMemo(() => {
-    if (!summary) {
-      return [
-        { label: '我的讲解', value: '12 条' },
-        { label: '被听懂', value: '1,847 次' },
-        { label: '已赚', value: '2.4 AVAX', accent: true },
-      ]
-    }
-
-    return [
-      { label: '我的讲解', value: `${summary.explanationsCreated} 条` },
-      { label: '被听懂', value: `${summary.understoodVotesReceived.toLocaleString()} 次` },
-      { label: '已赚', value: `${summary.avaxEarned} AVAX`, accent: true },
-    ]
-  }, [summary])
-
-  const unlockedBadgeIds = useMemo(() => {
-    if (!summary) return new Set(earnedBadges.map((badge) => badge.id))
-
-    const next = new Set()
-    if (summary.explanationsCreated >= 1) next.add('first-voice')
-    if (Number(summary.avaxEarned) > 0) next.add('first-earn')
-    if (summary.explanationsValidated >= 10) next.add('translator')
-    if (summary.understoodVotesCast >= 50) next.add('reviewer')
-    if (summary.understoodVotesReceived >= 100) next.add('viral')
-    return next
-  }, [summary])
-
-  async function handleWithdraw() {
-    try {
-      setWithdrawing(true)
-      setWithdrawTx(null)
-      const tx = await withdrawPendingRewards()
-      setWithdrawTx(tx)
-    } catch (error) {
-      window.alert(error?.message || '提现失败，请稍后重试。')
-    } finally {
-      setWithdrawing(false)
-    }
-  }
+  const totalEarned = AVAX_RECORDS.filter(r => r.type === 'earn').reduce((s, r) => s + r.amount, 0)
+  const totalSpent = AVAX_RECORDS.filter(r => r.type === 'pay').reduce((s, r) => s + r.amount, 0)
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] overflow-hidden bg-[#0a0612] bg-mesh text-[#f0eef5]">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-50"
-        style={{
-          background:
-            'radial-gradient(ellipse at 30% 0%, rgba(255,107,107,0.1), transparent 50%), radial-gradient(ellipse at 90% 60%, rgba(108,92,231,0.12), transparent 45%)',
-        }}
-      />
+    <div className="min-h-screen bg-mesh text-[#f0eef5]">
+      <motion.div className="mx-auto max-w-3xl px-4 py-6" variants={container} initial="hidden" animate="show">
 
-      <motion.div
-        className="relative z-10 mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:max-w-4xl lg:py-14"
-        variants={container}
-        initial="hidden"
-        animate="show"
-      >
         {/* Header */}
-        <motion.header variants={item} className={`${glass} overflow-hidden p-6 md:p-8`}>
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <motion.div
-                className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-coral-500/20 to-violet-500/25 text-3xl shadow-[0_0_32px_rgba(255,107,107,0.25)]"
-                whileHover={{ scale: 1.05 }}
-              >
-                🌸
-              </motion.div>
-              <div>
-                <h1 className="text-2xl font-bold text-white md:text-3xl">{summary ? '链上讲解者' : '佳佳'}</h1>
-                <p className="mt-1 font-mono text-sm text-white/50">{summary ? shortenAddress(summary.address) : '0x3f…a2'}</p>
-              </div>
+        <motion.div variants={item} className={`${glass} p-6 mb-6`}>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-[#ff9f7f] to-[#e84a4a] flex items-center justify-center text-3xl shadow-lg">🌸</div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">佳佳</h1>
+              <p className="font-mono text-xs text-[#a29bfe]/70">0x3f...a2</p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3">
-              <span className="text-lg font-semibold text-amber-200/95">$PROVE</span>
-              <span className="text-2xl font-bold tabular-nums text-white">{summary ? summary.proveBalance : 956}</span>
+            <div className="ml-auto text-right">
+              <p className="text-xs text-white/40">$PROVE</p>
+              <p className="text-2xl font-bold text-[#f9ca24]">956</p>
             </div>
           </div>
-        </motion.header>
 
-        {/* Stats */}
-        <motion.div
-          variants={item}
-          className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3"
-        >
-          {statCards.map((s) => (
-            <motion.div
-              key={s.label}
-              variants={item}
-              className={`${glass} px-5 py-5 text-center`}
-              whileHover={{ y: -2, boxShadow: '0 12px 40px rgba(162,155,254,0.12)' }}
+          {/* AVAX 余额 */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl bg-black/20 border border-white/[0.06] p-3 text-center">
+              <p className="text-lg font-bold text-white tabular-nums">{(totalEarned - totalSpent).toFixed(2)}</p>
+              <p className="text-[10px] text-white/40">AVAX 余额</p>
+            </div>
+            <div className="rounded-xl bg-emerald-500/10 border border-emerald-400/15 p-3 text-center">
+              <p className="text-lg font-bold text-emerald-300 tabular-nums">+{totalEarned.toFixed(2)}</p>
+              <p className="text-[10px] text-emerald-300/50">总收入</p>
+            </div>
+            <div className="rounded-xl bg-[#ff6b6b]/10 border border-[#ff6b6b]/15 p-3 text-center">
+              <p className="text-lg font-bold text-[#ff6b6b] tabular-nums">-{totalSpent.toFixed(2)}</p>
+              <p className="text-[10px] text-[#ff6b6b]/50">总支出</p>
+            </div>
+          </div>
+
+          {/* 统计 */}
+          <div className="grid grid-cols-4 gap-3 mt-3">
+            {[
+              { label: '我的讲解', value: MY_EXPLANATIONS.length },
+              { label: '被听懂', value: '546' },
+              { label: '听过的', value: LISTENED.length },
+              { label: '启发了', value: '8 人' },
+            ].map((s, i) => (
+              <div key={i} className="text-center">
+                <p className="text-base font-bold text-white">{s.value}</p>
+                <p className="text-[10px] text-white/35">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* SBT 成就 */}
+        <motion.div variants={item} className="mb-6">
+          <p className="text-sm font-semibold text-white/50 mb-3">🏆 链上成就</p>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+            {BADGES.map(b => (
+              <div key={b.id} className={`${glass} p-3 text-center ${b.unlocked ? 'glow-coral' : 'opacity-40'}`}>
+                <span className="text-2xl">{b.unlocked ? b.emoji : '🔒'}</span>
+                <p className="text-[10px] text-white/60 mt-1 leading-tight">{b.title}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Tabs */}
+        <motion.div variants={item} className="flex gap-1 mb-4">
+          {[
+            { id: 'records', label: '💰 AVAX 记录' },
+            { id: 'published', label: '📐 我的讲解' },
+            { id: 'listened', label: '👂 听过的' },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+                tab === t.id ? 'bg-white/10 text-white border border-white/15' : 'text-white/40 hover:text-white/60'
+              }`}
             >
-              <p className="text-xs uppercase tracking-[0.15em] text-white/40">{s.label}</p>
-              <p
-                className={`mt-2 text-xl font-semibold tabular-nums md:text-2xl ${
-                  s.accent ? 'text-amber-200/95' : 'text-white'
-                }`}
-              >
-                {s.value}
-              </p>
-            </motion.div>
+              {t.label}
+            </button>
           ))}
         </motion.div>
 
-        {/* SBT */}
-        <motion.section variants={item} className="mt-10">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.25em] text-white/40">成就 SBT</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {earnedBadges.map((b, i) => (
-              <motion.div
-                key={b.id}
-                variants={item}
-                custom={i}
-                className={`relative overflow-hidden rounded-2xl border p-5 ${
-                  unlockedBadgeIds.has(b.id) ? 'border-white/[0.1]' : 'border-white/[0.06] opacity-55 grayscale'
-                }`}
-                style={{
-                  background: 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)',
-                  boxShadow: '0 0 48px rgba(162, 155, 254, 0.08), inset 0 1px 0 rgba(255,255,255,0.06)',
-                }}
-                whileHover={{ scale: 1.02 }}
-              >
-                <div
-                  className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br ${b.glow} blur-2xl opacity-90`}
-                />
-                <div className="relative flex items-start gap-3">
-                  <span className="text-2xl drop-shadow-[0_0_8px_rgba(249,202,36,0.4)]">{b.emoji}</span>
-                  <div>
-                    <h3 className="font-semibold text-white">{b.title}</h3>
-                    <p className="mt-1 text-sm text-white/55">{b.desc}</p>
+        {/* Tab Content */}
+        <motion.div variants={item}>
+          {tab === 'records' && (
+            <div className="space-y-2">
+              {AVAX_RECORDS.map(r => (
+                <div key={r.id} className={`${glass} px-4 py-3 flex items-center gap-3`}>
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center text-sm ${
+                    r.type === 'earn' ? 'bg-emerald-500/15' : 'bg-[#ff6b6b]/15'
+                  }`}>
+                    {r.type === 'earn' ? '💰' : '🔗'}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white/80 truncate">{r.desc}</p>
+                    <p className="text-[10px] text-white/30">{r.time}</p>
+                  </div>
+                  <p className={`text-sm font-semibold tabular-nums ${r.type === 'earn' ? 'text-emerald-300' : 'text-[#ff6b6b]'}`}>
+                    {r.type === 'earn' ? '+' : '-'}{r.amount} AVAX
+                  </p>
                 </div>
-                <motion.div
-                  className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/[0.06]"
-                  animate={{ opacity: [0.5, 0.85, 0.5] }}
-                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                />
-              </motion.div>
-            ))}
-
-            {lockedBadges.map((b) => (
-              <motion.div
-                key={b.id}
-                variants={item}
-                className={`relative rounded-2xl border bg-black/25 p-5 ${
-                  unlockedBadgeIds.has(b.id) ? 'border-white/[0.1]' : 'border-white/[0.06] opacity-55 grayscale'
-                }`}
-              >
-                {!unlockedBadgeIds.has(b.id) && (
-                  <div className="absolute right-4 top-4 text-white/40">
-                    <HiLockClosed className="text-lg" aria-label="未解锁" />
-                  </div>
-                )}
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl opacity-50">{b.emoji}</span>
-                  <div>
-                    <h3 className="font-semibold text-white/70">{b.title}</h3>
-                    <p className="mt-1 text-sm text-white/40">{b.desc}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-
-        {/* Inspired */}
-        <motion.section variants={item} className={`${glass} mt-10 p-6 md:p-8`}>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/40">我启发了</h2>
-          <p className="mt-3 text-lg text-white/85 md:text-xl">
-            我的讲解已有 <span className="bg-gradient-to-r from-coral-400 to-amber-300 bg-clip-text font-bold text-transparent">{summary ? summary.explanationsValidated : 8}</span>{' '}
-            条被社区完成验证
-          </p>
-          <MiniChain />
-          <p className="text-center text-xs text-white/35">灵感在链上连成一条温柔的线</p>
-        </motion.section>
-
-        {/* Income */}
-        <motion.section variants={item} className={`${glass} mt-8 p-6 md:p-8`}>
-          <div className="mb-4 flex items-center gap-2">
-            <AvalancheMark className="h-5 w-5 shrink-0 opacity-90" />
-            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/40">收入记录</h2>
-          </div>
-          <ul className="divide-y divide-white/[0.06]">
-            {(summary
-              ? [
-                  { label: '累计已赚', value: `${summary.avaxEarned} AVAX` },
-                  { label: '待提现', value: `${summary.pendingAvax} AVAX` },
-                  { label: 'Bounty 获胜次数', value: `${summary.bountyWins} 次` },
-                  { label: '已拥有成就 SBT', value: `${summary.badges} 枚` },
-                ]
-              : incomeRows.map((row) => ({ label: `${row.type} · ${row.time}`, value: `+${row.amount} AVAX` }))
-            ).map((row) => (
-              <motion.li
-                key={row.label}
-                variants={item}
-                className="flex items-center justify-between py-4 first:pt-0"
-              >
-                <p className="text-sm font-medium text-white/85">{row.label}</p>
-                <span className="font-mono text-sm font-semibold text-amber-200/90">{row.value}</span>
-              </motion.li>
-            ))}
-          </ul>
-          {summary && (
-            <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
-              <div>
-                <p className="text-sm font-medium text-white/85">提取待领取收益</p>
-                <p className="mt-1 text-xs text-white/40">当前可提：{summary.pendingAvax} AVAX</p>
-              </div>
-              <button
-                type="button"
-                disabled={withdrawing || Number(summary.pendingAvax) <= 0}
-                onClick={handleWithdraw}
-                className="rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-200 disabled:opacity-40"
-              >
-                {withdrawing ? '提现中…' : '提现'}
-              </button>
+              ))}
             </div>
           )}
-          {withdrawTx && (
-            <a
-              href={withdrawTx.explorerUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 block text-xs font-mono text-emerald-300/80 underline decoration-emerald-400/30 underline-offset-2"
-            >
-              提现交易：{withdrawTx.txHash}
-            </a>
+
+          {tab === 'published' && (
+            <div className="space-y-2">
+              {MY_EXPLANATIONS.map(e => (
+                <Link key={e.id} to={`/translation/${e.id}`}>
+                  <div className={`${glass} px-4 py-3 hover:border-white/20 transition-colors`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] bg-[#ff6b6b]/15 text-[#ff6b6b] rounded-full px-2 py-0.5 border border-[#ff6b6b]/20">{e.topic}</span>
+                      <span className="text-[10px] text-white/30">{e.style}</span>
+                      <span className="text-[10px] text-white/20 ml-auto">{e.time}</span>
+                    </div>
+                    <p className="text-sm text-white/75">「{e.text}」</p>
+                    <div className="flex gap-3 mt-2 text-[10px]">
+                      <span className="text-emerald-300/70">✅ {e.votes} 人听懂</span>
+                      <span className="text-amber-200/70">💰 已赚 {e.earned} AVAX</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
-        </motion.section>
+
+          {tab === 'listened' && (
+            <div className="space-y-2">
+              {LISTENED.map(l => (
+                <div key={l.id} className={`${glass} px-4 py-3`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">{l.avatar}</span>
+                    <span className="text-xs font-semibold text-white">{l.author}</span>
+                    <span className="text-[10px] bg-[#a29bfe]/15 text-[#a29bfe] rounded-full px-2 py-0.5">{l.topic}</span>
+                    <span className="text-[10px] text-white/20 ml-auto">{l.time}</span>
+                  </div>
+                  <p className="text-sm text-white/60">「{l.text}」</p>
+                  <p className="text-[10px] text-[#ff6b6b]/50 mt-1">花费 {l.cost} AVAX</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
       </motion.div>
     </div>
   )

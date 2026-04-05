@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { HiSparkles } from 'react-icons/hi2'
 import { generateExplanations, generateAnimation, generateImage, generateManimVideo, chatWithAssistant } from '../utils/ai'
+import { useAvaxToast } from '../components/AvaxToast'
 import { mockChainSubmit } from '../utils/chain'
 import { DERIVATIVE_TREE, TOPICS } from '../data/mockTree'
 
@@ -177,6 +178,7 @@ export default function Create() {
   const [txResult, setTxResult] = useState(null)
 
   const recorder = useRecorder()
+  const toast = useAvaxToast()
 
   const textbook = DERIVATIVE_TREE.textbook
   const selectedText = selectedIdx >= 0 ? editedTexts[selectedIdx] : ''
@@ -250,6 +252,7 @@ export default function Create() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true)
+    toast.pay(0.02, '发布讲解上链')
     try {
       const res = await mockChainSubmit()
       setTxResult(res)
@@ -606,7 +609,7 @@ export default function Create() {
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                 >
-                  {isSubmitting ? '正在上链…' : '✨ 提交上链'}
+                  {isSubmitting ? '正在上链…' : '✨ 提交上链（0.02 AVAX）'}
                 </motion.button>
               </motion.div>
             )}
